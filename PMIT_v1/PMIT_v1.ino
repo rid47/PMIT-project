@@ -2,21 +2,25 @@
 //-----------------------------Including required libraries-------------------------------------------------//
 
 #include "DHT.h"
+#include <DNSServer.h>
+#include <Ticker.h>
+#include <ESP8266WebServer.h>
+#include <WiFiManager.h>    
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 
 //-----------------------------Defining required pins-------------------------------------------------------//
 
 #define co2_sensor A0
-#define dht_dpin D3 
+#define dht_dpin D3
 #define DHTTYPE DHT22
 
 long data_publishing_interval=1000;
 
 //--------------------------------WiFi and MQTT credentials-----------------------------------------------//
 
-const char* ssid = "home";
-const char* password = "ridwanmizan";
+//const char* ssid = "home";
+//const char* password = "ridwanmizan";
 const char* mqtt_server = "iot.eclipse.org";
 const int mqttPort = 1883;
 
@@ -32,11 +36,29 @@ int data3=0;
 unsigned long lastMsg = 0;
 unsigned long previousMillis = 0;
 
+
+
+//--------------------ISR for implementing WatchDog-------------------//
+Ticker secondTick;
+volatile int watchdogCount=0;
+void ISRwatchdog(){
+
+watchdogCount++;
+if(watchdogCount==150){
+
+
+    Serial.println();
+    Serial.print("The watch dog bites......");
+    //ESP.reset();
+    ESP.restart();
+  }
+}
 void setup()
 { 
 
   Serial.begin(115200);
-  Serial.println("I'm here");
+  secondTick.attach(1,ISRwatchdog);
+  
   pinMode(dht_dpin,INPUT);
   pinMode(co2_sensor,INPUT);
 
@@ -48,6 +70,8 @@ void setup()
 //----------------------------------------Main Loop------------------------------------//
 
 void loop(){
+
+  watchdogCount=0;
 
   if (!client.connected()) {
     reconnect();
@@ -76,18 +100,20 @@ int temp()
 {
   
   int t = dht.readTemperature();         
-  return t;
+ 
   Serial.print("Temperature=");
   Serial.println(t);
+  return t;
    
   }
 
 int hum()
 {
   int h = dht.readHumidity();
-  return h;
+  
   Serial.print("Humidity=");
   Serial.println(h);
+  return h;
   }
 
 int co2(){
@@ -105,28 +131,22 @@ sum=sum+co2now[x];
 co2raw=sum/10;
 co2raw=co2raw-55;
 co2ppm=map(co2raw,0,1024,300,2000);
-return co2ppm; 
+
 
   Serial.print("C02 in ppm=");
   Serial.println(co2ppm);
+  return co2ppm; 
 }
 
 //-----------------------------WiFi-------------------------------------------//
 
 void setup_wifi() {
-    
-    delay(100);
-  // We start by connecting to a WiFi network
-    Serial.print("Connecting to ");
-    Serial.println(ssid);
-    WiFi.begin(ssid, password);
-    while (WiFi.status() != WL_CONNECTED) 
-    {
-      delay(500);
-      Serial.print(".");
-    }
-    randomSeed(micros());
-    Serial.println("");
+
+
+    WiFiManager wifiManager;
+    //wifiManager.resetSettings();
+    wifiManager.autoConnect("Home Automation", "admin1234");
+    Serial.println("Connected.");
     Serial.println("WiFi connected");
     Serial.println("IP address: ");
     Serial.println(WiFi.localIP());
@@ -140,7 +160,7 @@ void reconnect() {
   {
     Serial.print("Attempting MQTT connection...");
     // Create a random client ID
-    String clientId = "ESP32-";
+    String clientId = "ESP8266-";
     clientId += String(random(0xffff), HEX);
     // Attempt to connect
     //if your MQTT broker has clientID,username and password
@@ -172,7 +192,7 @@ void reconnect() {
 } //end reconnect()
 
 
-//------------------------------Publishing sensor data every 5 minutes----------------------------------//
+//------------------------------Publishing sensor data every 1 minute----------------------------------//
 
 
 void sensor_data_publish(){
@@ -190,9 +210,3 @@ void sensor_data_publish(){
     client.publish("home/sensor_data",message);
   }
 }
-
-
-
-  
- 
-
