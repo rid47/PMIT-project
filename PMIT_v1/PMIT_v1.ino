@@ -56,6 +56,8 @@ unsigned long previousMillis = 0;
 
 
 //--------------------ISR for implementing WatchDog-------------------//
+
+
 Ticker secondTick;
 volatile int watchdogCount=0;
 void ISRwatchdog(){
@@ -70,6 +72,11 @@ if(watchdogCount==150){
     ESP.restart();
   }
 }
+
+
+//--------------------------SETUP function to run only once-----------------------------------------//
+
+
 void setup()
 { 
 
@@ -83,6 +90,7 @@ void setup()
   dht.begin();
   setup_wifi();
   client.setServer(mqtt_server,mqttPort);
+  client.setCallback(callback);
 }
 
 //----------------------------------------Main Loop------------------------------------//
