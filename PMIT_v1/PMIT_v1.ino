@@ -14,10 +14,27 @@
 #define co2_sensor A0
 #define dht_dpin D3
 #define DHTTYPE DHT22
+#define loadPin D4
 
-long data_publishing_interval=1000;
+long data_publishing_interval=30000;
 
-//--------------------------------WiFi and MQTT credentials-----------------------------------------------//
+
+
+//-----------------------------Defining Required Global Variables--------------------------------------------------//
+
+
+int t,h,co2now[10],co2raw,co2comp,co2ppm,sum;
+char sensorData[68];
+String msg;
+char loginData,loadData,resetData;// for receiving MQTT payload
+
+
+//------------------------Storing Hardware Status-------------------------------------------------------------------//
+
+String loadStatus="off";
+char lightStatus[6];
+
+//--------------------------------WiFi and MQTT credentials---------------------------------------------------------//
 
 //const char* ssid = "home";
 //const char* password = "ridwanmizan";
@@ -29,9 +46,9 @@ PubSubClient client(espClient);
 
 DHT dht(dht_dpin, DHTTYPE); 
 
-int data1=0;
-int data2=0;
-int data3=0;
+int tempData=0;
+int humData=0;
+int co2Data=0;
 
 unsigned long lastMsg = 0;
 unsigned long previousMillis = 0;
@@ -61,7 +78,8 @@ void setup()
   
   pinMode(dht_dpin,INPUT);
   pinMode(co2_sensor,INPUT);
-
+  pinMode(loadPin,OUTPUT);
+  digitalWrite(loadPin,HIGH);
   dht.begin();
   setup_wifi();
   client.setServer(mqtt_server,mqttPort);
@@ -78,13 +96,13 @@ void loop(){
   }
   client.loop();
   
-  data1=temp();
-  data2=hum();
+  tempData=temp();
+  humData=hum();
   delay(200);
-  data3=co2();
+  co2Data=co2();
   
   
-  if (data1<50){
+  if (tempData<50){
 
   sensor_data_publish();
   
@@ -99,7 +117,7 @@ void loop(){
 int temp()
 {
   
-  int t = dht.readTemperature();         
+  t = dht.readTemperature();         
  
   Serial.print("Temperature=");
   Serial.println(t);
@@ -109,7 +127,7 @@ int temp()
 
 int hum()
 {
-  int h = dht.readHumidity();
+  h = dht.readHumidity();
   
   Serial.print("Humidity=");
   Serial.println(h);
@@ -118,11 +136,11 @@ int hum()
 
 int co2(){
 
-int co2now[10];//long array for co2 readings
-int co2raw=0;  //long for raw value of co2
-int co2comp = 0;   //long for compensated co2 
-int co2ppm = 0;    //long for calculated ppm
-int sum=0;
+
+co2raw=0;  //long for raw value of co2
+co2comp = 0;   //long for compensated co2 
+co2ppm = 0;    //long for calculated ppm
+sum=0;
 for (int x=0;x<10;x++){
 
 co2now[x]=analogRead(co2_sensor);
@@ -174,11 +192,17 @@ void reconnect() {
       client.publish("home/online","Device online");
      
      //once connected to MQTT broker, subscribe command if any
-     //----------------------Subscribing to required topics-----------------------//
+
+
+//------------------------------------------Subscribing to required topics---------------------------------//
 
      
-      //client.subscribe("mushroom/user_input");
-      //Serial.println("Subsribed to topic: mushroom/user_input");
+      client.subscribe("home/user_input");
+      Serial.println("Subsribed to topic: home/user_input");
+      client.subscribe("home/login");
+      Serial.println("Subscribed to topic: home/login");
+      client.subscribe("home/reset");
+      Serial.println("Subscribed to topic: home/reset");
       
       
     } else {
@@ -192,7 +216,7 @@ void reconnect() {
 } //end reconnect()
 
 
-//------------------------------Publishing sensor data every 1 minute----------------------------------//
+//------------------------------Publishing sensor data every 30 seconds----------------------------------//
 
 
 void sensor_data_publish(){
@@ -201,12 +225,80 @@ void sensor_data_publish(){
   if(now-lastMsg>data_publishing_interval){
     
     lastMsg=now;
-    String msg=""; 
-    msg= msg+ data2+","+data1+","+data3;
-    char message[68];
-    msg.toCharArray(message,68);
+    msg=""; 
+    msg= msg+tempData+","+humData+","+co2Data;
+    
+    msg.toCharArray(sensorData,68);
    //Serial.println(msg);
-    Serial.println(message);
-    client.publish("home/sensor_data",message);
+   Serial.println(sensorData);
+   client.publish("home/sensor_data",sensorData);
   }
 }
+
+
+//---------------------------Callback funtion-------------------------------------//
+
+void callback(char* topic, byte* payload, unsigned int length) {
+
+  Serial.print("Message arrived in topic: ");
+  Serial.println(topic);
+
+
+
+//-------------------------Load Control Remotely--------------------------------------------------------//
+
+if(strcmp(topic,"home/user_input")==0){
+
+
+  for(int i=0;i<length;i++){
+
+
+    Serial.print((char)payload[i]);
+    loadData=payload[i];
+  
+  if (loadData=='1'){
+
+
+    digitalWrite(loadPin,LOW);
+    loadStatus="on";
+  }
+  else if(loadData=='0'){
+
+    digitalWrite(loadPin,HIGH);
+    loadStatus="off";
+  }
+}}
+
+//-------------------------Publishing device status upon request from user app--------------------------//
+
+  
+  if(strcmp(topic, "home/login") == 0){
+  for (int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
+    loginData=payload[i];
+
+
+    if (loginData=='1')
+    {
+
+      loadStatus.toCharArray(lightStatus,6);
+      client.publish("home/load_status",lightStatus);
+      Serial.print("Published load_status:");
+      Serial.println(lightStatus);
+    }}}
+
+//----------------------------------Restarting the board from Engineer's end----------------------------//
+
+  if(strcmp(topic, "home/reset") == 0){
+  Serial.print("Message:");
+  for (int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
+    resetData=payload[i];
+
+
+    if (resetData=='1')
+    {
+
+      Serial.println("Resetting Device.........");
+       ESP.restart();
+      }}}}// End of callback function
