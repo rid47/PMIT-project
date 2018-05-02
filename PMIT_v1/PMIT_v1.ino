@@ -1,5 +1,5 @@
 //Download adafruit unified sensor library if you haven't already
-//-----------------------------Including required libraries-------------------------------------------------//
+//-----------------------------Including required libraries----------------------------------------------------------//
 
 #include "DHT.h"
 #include <DNSServer.h>
@@ -9,13 +9,14 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 
-//-----------------------------Defining required pins-------------------------------------------------------//
+//-----------------------------Defining required pins---------------------------------------------------------------//
 
 #define co2_sensor A0
 #define dht_dpin D3
 #define DHTTYPE DHT22
-#define loadPin D4
-
+#define loadPin D5
+#define acPin D6
+#define fanPin D7
 long data_publishing_interval=30000;
 
 
@@ -33,6 +34,13 @@ char loginData,loadData,resetData;// for receiving MQTT payload
 
 String loadStatus="off";
 char lightStatus[6];
+
+
+//-------------------Storing temperature threshold from user end----------------------------------------------------//
+
+String tempThreshold;
+char tempThresholdData[6];
+String currentTemp;
 
 //--------------------------------WiFi and MQTT credentials---------------------------------------------------------//
 
@@ -55,7 +63,7 @@ unsigned long previousMillis = 0;
 
 
 
-//--------------------ISR for implementing WatchDog-------------------//
+//--------------------ISR for implementing WatchDog--------------------------------------------------------------//
 
 
 Ticker secondTick;
@@ -74,35 +82,55 @@ if(watchdogCount==150){
 }
 
 
-//--------------------------SETUP function to run only once-----------------------------------------//
+//--------------------------SETUP function to run only once-------------------------------------------------//
 
 
 void setup()
 { 
 
-  Serial.begin(115200);
-  secondTick.attach(1,ISRwatchdog);
+  Serial.begin(115200);// Initializing Serial Monitor
+  
+  secondTick.attach(1,ISRwatchdog); // Attaching ISRwatchdog function with ticker
+
+
+  //----------------Initializing sensor pins as input and load pins as output------------------------------//
   
   pinMode(dht_dpin,INPUT);
   pinMode(co2_sensor,INPUT);
   pinMode(loadPin,OUTPUT);
+  pinMode(acPin,OUTPUT);
+  pinMode(fanPin,OUTPUT);
+  
+  
+  //--------------------------Intializing all loads in off condition-------------------------------------//
+
   digitalWrite(loadPin,HIGH);
-  dht.begin();
-  setup_wifi();
-  client.setServer(mqtt_server,mqttPort);
-  client.setCallback(callback);
+  digitalWrite(acPin,HIGH);
+  digitalWrite(fanPin,HIGH);
+  
+  dht.begin();// Beginning DHT to read humidity and tempearature
+  setup_wifi();// Setting up WiFi
+  
+  client.setServer(mqtt_server,mqttPort);// Setting MQTT server and port
+  
+  client.setCallback(callback);// calling back callback function when new messages arrives 
+
 }
 
-//----------------------------------------Main Loop------------------------------------//
+//----------------------------------------Main Loop-----------------------------------------------------//
 
 void loop(){
 
-  watchdogCount=0;
+  watchdogCount=0;// Reseting the watchdog count
 
   if (!client.connected()) {
-    reconnect();
+    reconnect();// Connecting to MQTT client & subscribing to required topics
   }
   client.loop();
+
+
+//---------------------------------Reading sensor data------------------------------------------------//
+
   
   tempData=temp();
   humData=hum();
@@ -116,10 +144,32 @@ void loop(){
   
   }
 
+  
+//----------------------------------------Controlling AC based on user threshold---------------------//
+  
+  
+  currentTemp="";
+  currentTemp=currentTemp+tempData;// Converting int temp data to string
+ 
+  if(currentTemp>tempThreshold)
+ {
+  //Serial.println("AC On");
+  digitalWrite(acPin,LOW);
+ } 
+  else
+
+  {
+    //Serial.println("AC off");
+    digitalWrite(acPin,HIGH);
+  }
+
+
+  
+
 }
 
 
-//-------------------------------Reading Sensor Data--------------------------------------------//
+//----------------------------------Reading Sensor Data--------------------------------------------//
 
 
 int temp()
@@ -127,8 +177,8 @@ int temp()
   
   t = dht.readTemperature();         
  
-  Serial.print("Temperature=");
-  Serial.println(t);
+  //Serial.print("Temperature=");
+  //Serial.println(t);
   return t;
    
   }
@@ -137,8 +187,8 @@ int hum()
 {
   h = dht.readHumidity();
   
-  Serial.print("Humidity=");
-  Serial.println(h);
+  //Serial.print("Humidity=");
+  //Serial.println(h);
   return h;
   }
 
@@ -159,12 +209,12 @@ co2raw=co2raw-55;
 co2ppm=map(co2raw,0,1024,300,2000);
 
 
-  Serial.print("C02 in ppm=");
-  Serial.println(co2ppm);
+  //Serial.print("C02 in ppm=");
+  //Serial.println(co2ppm);
   return co2ppm; 
 }
 
-//-----------------------------WiFi-------------------------------------------//
+//-------------------------------------------------------WiFi-------------------------------------------//
 
 void setup_wifi() {
 
@@ -178,7 +228,7 @@ void setup_wifi() {
     Serial.println(WiFi.localIP());
 }
 
-//---------------------------While client not conncected---------------------------------//
+//-------------------------------------------While client not conncected---------------------------------//
 
 void reconnect() {
   // Loop until we're reconnected
@@ -202,11 +252,13 @@ void reconnect() {
      //once connected to MQTT broker, subscribe command if any
 
 
-//------------------------------------------Subscribing to required topics---------------------------------//
+//--------------------------------------Subscribing to required topics---------------------------------//
 
      
       client.subscribe("home/user_input");
       Serial.println("Subsribed to topic: home/user_input");
+      client.subscribe("home/temp");
+      Serial.println("Subscribed to topic: home/temp");
       client.subscribe("home/login");
       Serial.println("Subscribed to topic: home/login");
       client.subscribe("home/reset");
@@ -224,7 +276,7 @@ void reconnect() {
 } //end reconnect()
 
 
-//------------------------------Publishing sensor data every 30 seconds----------------------------------//
+//--------------------------Publishing sensor data every 30 seconds----------------------------------//
 
 
 void sensor_data_publish(){
@@ -244,7 +296,9 @@ void sensor_data_publish(){
 }
 
 
-//---------------------------Callback funtion-------------------------------------//
+
+//------------------------------------------Callback funtion-------------------------------------//
+
 
 void callback(char* topic, byte* payload, unsigned int length) {
 
@@ -253,7 +307,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
 
 
-//-------------------------Load Control Remotely--------------------------------------------------------//
+//------------------Load Control Remotely--------------------------------------------------------//
+
 
 if(strcmp(topic,"home/user_input")==0){
 
@@ -277,6 +332,25 @@ if(strcmp(topic,"home/user_input")==0){
   }
 }}
 
+
+//-------------------------------Getting temperature threshold from user--------------------------------//
+
+
+      if(strcmp(topic, "home/temp") == 0)
+      {
+
+        Serial.print("Message:");
+        for (int i = 0; i < length; i++) {
+        tempThresholdData[i]=payload[i];
+    }
+    
+    tempThreshold="";
+    tempThreshold=tempThreshold+tempThresholdData;
+    Serial.println(tempThreshold);
+    
+    }
+
+
 //-------------------------Publishing device status upon request from user app--------------------------//
 
   
@@ -295,8 +369,10 @@ if(strcmp(topic,"home/user_input")==0){
       Serial.println(lightStatus);
     }}}
 
+
 //----------------------------------Restarting the board from Engineer's end----------------------------//
 
+  
   if(strcmp(topic, "home/reset") == 0){
   Serial.print("Message:");
   for (int i = 0; i < length; i++) {
