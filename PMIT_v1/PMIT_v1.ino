@@ -1,3 +1,4 @@
+int i=0;
 //Download adafruit unified sensor library if you haven't already
 //-----------------------------Including required libraries----------------------------------------------------------//
 
@@ -30,17 +31,26 @@ String msg;
 char loginData,loadData,resetData;// for receiving MQTT payload
 
 
-//------------------------Storing Hardware Status-------------------------------------------------------------------//
+//------------------------Storing Load Status-------------------------------------------------------------------//
 
-String loadStatus="off";
-char lightStatus[6];
+String lightStatus="0";
+String acStatus="0";
+String fanStatus="0";
+String homeStatus;
+char loadStatus[6];
 
 
 //-------------------Storing temperature threshold from user end----------------------------------------------------//
 
-String tempThreshold;
+int tempThreshold;
 char tempThresholdData[6];
-String currentTemp;
+
+
+//-------------------Storing co2 threshold from user end----------------------------------------------------//
+
+int co2Threshold;
+char co2ThresholdData[6];
+
 
 //--------------------------------WiFi and MQTT credentials---------------------------------------------------------//
 
@@ -148,23 +158,40 @@ void loop(){
 //----------------------------------------Controlling AC based on user threshold---------------------//
   
   
-  currentTemp="";
-  currentTemp=currentTemp+tempData;// Converting int temp data to string
- 
-  if(currentTemp>tempThreshold)
+  
+  if(tempData>tempThreshold && acStatus=="0")
  {
   //Serial.println("AC On");
   digitalWrite(acPin,LOW);
+  acStatus="1";
  } 
-  else
+ 
+ else if (tempData<tempThreshold && acStatus=="1")
 
   {
     //Serial.println("AC off");
     digitalWrite(acPin,HIGH);
+    acStatus="0";
   }
 
 
+//----------------------------------------Controlling Exhaust fan based on user threshold---------------------//
   
+  
+  
+  if(co2Data>co2Threshold && fanStatus=="0")
+ {
+  //Serial.println("FAN On");
+  digitalWrite(fanPin,LOW);
+  fanStatus="1";
+ } 
+ else if (co2Data<co2Threshold && fanStatus=="1")
+
+  {
+    //Serial.println("FAN off");
+    digitalWrite(fanPin,HIGH);
+    fanStatus="0";
+  }
 
 }
 
@@ -209,7 +236,7 @@ co2raw=co2raw-55;
 co2ppm=map(co2raw,0,1024,300,2000);
 
 
-  //Serial.print("C02 in ppm=");
+  //Serial.print("co2 in ppm=");
   //Serial.println(co2ppm);
   return co2ppm; 
 }
@@ -260,6 +287,8 @@ void reconnect() {
       client.subscribe("home/temp");
       Serial.println("Subscribed to topic: home/temp");
       client.subscribe("home/login");
+      Serial.println("Subscribed to topic: home/co2");
+      client.subscribe("home/co2");
       Serial.println("Subscribed to topic: home/login");
       client.subscribe("home/reset");
       Serial.println("Subscribed to topic: home/reset");
@@ -307,7 +336,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
 
 
-//------------------Load Control Remotely--------------------------------------------------------//
+//-------------------------------Load Control Remotely--------------------------------------------------------//
 
 
 if(strcmp(topic,"home/user_input")==0){
@@ -323,12 +352,12 @@ if(strcmp(topic,"home/user_input")==0){
 
 
     digitalWrite(loadPin,LOW);
-    loadStatus="on";
+    lightStatus="1";
   }
   else if(loadData=='0'){
 
     digitalWrite(loadPin,HIGH);
-    loadStatus="off";
+    lightStatus="0";
   }
 }}
 
@@ -338,20 +367,38 @@ if(strcmp(topic,"home/user_input")==0){
 
       if(strcmp(topic, "home/temp") == 0)
       {
-
+        memset(tempThresholdData,0, sizeof(tempThresholdData));// Emptying the char array
         Serial.print("Message:");
         for (int i = 0; i < length; i++) {
         tempThresholdData[i]=payload[i];
     }
     
-    tempThreshold="";
-    tempThreshold=tempThreshold+tempThresholdData;
+    
+    tempThreshold=atoi(tempThresholdData);// Converting char array to int
     Serial.println(tempThreshold);
     
     }
 
 
-//-------------------------Publishing device status upon request from user app--------------------------//
+//-------------------------------Getting co2 threshold from user--------------------------------//
+
+
+      if(strcmp(topic, "home/co2") == 0)
+      {
+        memset(co2ThresholdData,0, sizeof(co2ThresholdData));// Emptying the char array
+        Serial.print("Message:");
+        for (int i = 0; i < length; i++) {
+        co2ThresholdData[i]=payload[i];
+    }
+    
+    
+    co2Threshold=atoi(co2ThresholdData);// Converting the char array to int
+    Serial.println(co2Threshold);
+    
+    
+    }
+
+//-------------------------Publishing Home status upon request from user app--------------------------//
 
   
   if(strcmp(topic, "home/login") == 0){
@@ -363,8 +410,9 @@ if(strcmp(topic,"home/user_input")==0){
     if (loginData=='1')
     {
 
-      loadStatus.toCharArray(lightStatus,6);
-      client.publish("home/load_status",lightStatus);
+      homeStatus=acStatus+fanStatus+lightStatus;
+      homeStatus.toCharArray(loadStatus,6);
+      client.publish("home/load_status",loadStatus);
       Serial.print("Published load_status:");
       Serial.println(lightStatus);
     }}}
