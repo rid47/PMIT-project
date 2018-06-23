@@ -13,21 +13,17 @@ Ticker secondTick;
 #define slot6 26
 
 
-//int data_publishing_interval=10000;
-
 //--------------------------------WiFi and MQTT credentials-----------------------------------------------//
-
 
 const char* ssid = "real08";
 const char* password = "rashedmizan";
 const char* mqtt_server = "182.48.84.180";
 const int mqttPort = 1883;
-
 WiFiClient espClient;
 PubSubClient client(espClient);
 
  
-
+// Initializing variables to read pir sensors
 
 int data1=0;
 int data2=0;
@@ -35,8 +31,6 @@ int data3=0;
 int data4=0;
 int data5=0;
 int data6=0;
-long lastMsg = 0;
-
 
 
 //------------------------WATCH DOG SUBROUTINE-------------------------------//
@@ -56,6 +50,9 @@ void ISRwatchdog(){
   }
 }
 
+//--------------------------SET UP FUNCTION---------------------------------//
+
+
 void setup()
 { 
 
@@ -70,7 +67,7 @@ void setup()
   secondTick.attach(1,ISRwatchdog);
   setup_wifi();
   client.setServer(mqtt_server,mqttPort);
-  client.setCallback(callback);
+  
 }
 
 //----------------------------------------Main Loop------------------------------------//
@@ -93,7 +90,7 @@ void loop(){
   data5=analogRead(slot5);
   data6=analogRead(slot6);
   
-    }
+}// end of main loop
   
   
 
