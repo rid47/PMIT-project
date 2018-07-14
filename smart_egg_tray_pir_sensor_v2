@@ -9,10 +9,7 @@
 #include <PubSubClient.h>
 Ticker secondTick;
 
-
-
 //--------------------- Array to initialize pin and store data----------------------------------------------//
-
 
 int data[6];
 int counter[6]={0};
@@ -20,9 +17,9 @@ int totalEggs=0,previousTotal=0;
 
 //-----------------------------Defining required pins-------------------------------------------------------//
 
-int slot[6]={34,35,32,33,12,14};
+int slot[6]={36,39,34,35,32,33};
 
-//--------------------------------WiFi and MQTT credentials-----------------------------------------------//
+//----------------------------------WiFi and MQTT credentials-----------------------------------------------//
 
 const char* ssid = "real08";
 const char* password = "rashedmizan";
@@ -31,10 +28,7 @@ const int mqttPort = 1883;
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-
-
-
-//----------------------------------------------------WATCH DOG SUBROUTINE-------------------------------//
+//------------------------------------------------------WATCH DOG SUBROUTINE-------------------------------//
 
 volatile int watchdogCount=0;
 void ISRwatchdog(){
@@ -50,7 +44,7 @@ void ISRwatchdog(){
   }
 }
 
-//----------------------------------------------------SET UP FUNCTION---------------------------------//
+//--------------------------------------------------------SET UP FUNCTION---------------------------------//
 
 
 void setup()
@@ -71,7 +65,12 @@ void setup()
   for (int i=0;i<sizeof(data)/sizeof(int);++i)
 
   {
+    //Serial.println("---------------------Initialization-------------------------");
+
     data[i]=0;
+    Serial.print("data");
+    Serial.print(i);
+    Serial.println(data[i]);
   }
 
   WiFiManager wifiManager;
@@ -95,7 +94,7 @@ void setup()
 void loop(){
 
 //  Serial.print("Watch dog counter:");
-  watchdogCount=0;
+    watchdogCount=0;
 //  Serial.println(watchdogCount);
   
   if (!client.connected()) {
@@ -110,7 +109,8 @@ void loop(){
 //    Serial.print("slot:");
 //    Serial.println(slot[i]);
     data[i]=analogRead(slot[i]);
-    delay(1000);
+    //data[i]=digitalRead(slot[i]);
+    delay(300);
     Serial.print("data");
     Serial.print(i);
     Serial.print(":");
@@ -140,20 +140,20 @@ void loop(){
 
                 //Publishing updated data
 
-//                String eggs="";
-//                char eggsCount[1]={'0'};
-//                eggs=eggs+totalEggs;
-//                eggs.toCharArray(eggsCount,1);
-//                client.publish("home/eggs",eggsCount);
-//                Serial.print("published to home/eggs:");
-//                Serial.println(eggs);
+                  String eggs="";
+                  eggs=eggs+totalEggs;
+                  char eggsCount[4];
+                  eggs.toCharArray(eggsCount,4);
+                  client.publish("home/eggs",eggsCount);
+                  Serial.print("published to home/eggs:");
+                  Serial.println(eggsCount);
 
 //                String pubString =String(totalEggs);
 //                char message_buff[]=""; 
 //                pubString.toCharArray(message_buff, pubString.length()+1); 
 //                Serial.println(pubString); 
 //                client.publish("home/eggs", message_buff);
-                totalEggs=0;//resetting the totalEggs after publishing updated data
+                  totalEggs=0;//resetting the totalEggs after publishing updated data
                 }
 
     if(data[i]>3000 && counter[i]==1)
@@ -173,13 +173,14 @@ void loop(){
       }
       Serial.print("Total number of eggs available:");
       Serial.println(totalEggs);  
-//      String eggs="";
-//      char eggsCount[4];
-//      eggs=eggs+totalEggs;
-//      eggs.toCharArray(eggsCount,4);
-//      client.publish("home/eggs",eggsCount);
-//      Serial.print("published to home/eggs:");
-//      Serial.println(eggs);
+        
+        String eggs="";
+        char eggsCount[4];
+        eggs=eggs+totalEggs;
+        eggs.toCharArray(eggsCount,4);
+        client.publish("home/eggs",eggsCount);
+        Serial.print("published to home/eggs:");
+        Serial.println(eggsCount);
 
 //      String pubString =String(totalEggs);
 //      char message_buff[]=""; 
@@ -187,7 +188,7 @@ void loop(){
 //      Serial.println(pubString); 
 //      client.publish("home/eggs", message_buff); 
         totalEggs=0;
-      
+//      
       }
       
 
@@ -234,5 +235,7 @@ void reconnect() {
 
 
 
+
+  
 
   
