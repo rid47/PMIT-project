@@ -15,8 +15,8 @@ Ticker secondTick;
 
 //--------------------------------WiFi and MQTT credentials-----------------------------------------------//
 
-const char* ssid = "real08";
-const char* password = "rashedmizan";
+//const char* ssid = "real08";
+//const char* password = "rashedmizan";
 const char* mqtt_server = "182.48.84.180";
 const int mqttPort = 1883;
 WiFiClient espClient;
