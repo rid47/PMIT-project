@@ -274,7 +274,7 @@ void reconnect() {
       
       //publising "device online" to mushroom/online to remotely check if device is online
 
-      client.publish("home/online","Device online");
+      client.publish("Sensor/online","Device online");
      
      //once connected to MQTT broker, subscribe command if any
 
