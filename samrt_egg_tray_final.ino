@@ -4,7 +4,7 @@
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
 #include<ESP32Ticker.h>
-#include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
+//#include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
 #include <ArduinoJson.h>          //https://github.com/bblanchon/ArduinoJson
 #include <PubSubClient.h>
 Ticker secondTick;
@@ -22,8 +22,8 @@ int slot[6]={36,39,34,35,32,33};
 
 //----------------------------------WiFi and MQTT credentials-----------------------------------------------//
 
-//const char* ssid = "real08";
-//const char* password = "rashedmizan";
+const char* ssid = "Home";
+const char* password = "12345678";
 const char* mqtt_server = "iot.eclipse.org";
 const int mqttPort = 1883;
 WiFiClient espClient;
@@ -52,6 +52,7 @@ void setup()
 { 
 
   Serial.begin(115200);
+  secondTick.attach(1,ISRwatchdog);
   
   // Initializing pin as input
   
@@ -73,9 +74,9 @@ void setup()
     Serial.print(i);
     Serial.println(data[i]);
   }
-
+/*
   WiFiManager wifiManager;
-  secondTick.attach(1,ISRwatchdog);
+ 
   if (!wifiManager.autoConnect("Egg Tray", "admin1234")) {
     Serial.println("failed to connect and hit timeout");
     delay(3000);
@@ -83,7 +84,15 @@ void setup()
     delay(5000);
   }
   Serial.println("connected");//connected to wifi
-  
+  */
+
+   WiFi.begin(ssid,password);
+ 
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.println("Connecting to WiFi..");
+  }
+  Serial.println("Connected to the WiFi network");
   //Establishing MQTT connection
   
   client.setServer(mqtt_server,mqttPort);
@@ -325,4 +334,3 @@ if(strcmp(topic, "home2/reset") == 0){
 
 
   
-
