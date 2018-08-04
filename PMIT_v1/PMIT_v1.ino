@@ -6,7 +6,7 @@ int i=0;
 #include <DNSServer.h>
 #include <Ticker.h>
 #include <ESP8266WebServer.h>
-#include <WiFiManager.h>    
+//#include <WiFiManager.h>    
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 
@@ -54,8 +54,8 @@ char co2ThresholdData[6];
 
 //--------------------------------WiFi and MQTT credentials---------------------------------------------------------//
 
-//const char* ssid = "home";
-//const char* password = "ridwanmizan";
+const char* ssid = "Home";
+const char* password = "12345678";
 const char* mqtt_server = "iot.eclipse.org";
 const int mqttPort = 1883;
 
@@ -245,7 +245,7 @@ co2ppm=map(co2raw,0,1024,300,2000);
 
 void setup_wifi() {
 
-
+    /*
     WiFiManager wifiManager;
     //wifiManager.resetSettings();
     wifiManager.autoConnect("Home Automation", "admin1234");
@@ -253,6 +253,15 @@ void setup_wifi() {
     Serial.println("WiFi connected");
     Serial.println("IP address: ");
     Serial.println(WiFi.localIP());
+    */
+    
+  WiFi.begin(ssid,password);
+ 
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("Connected to the WiFi network");
 }
 
 //-------------------------------------------While client not conncected---------------------------------//
